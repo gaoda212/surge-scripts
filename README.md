@@ -61,16 +61,37 @@ python3 deploy-mac.py revert    # 还原最近一次备份
 [DB618F67] ===== 共 3 条 =====
 ```
 
-## iOS 版
+## iOS 版（已就绪）
 
-同一份脚本，路径按 iOS 的写法填即可（iOS 的 `script-path` 可以是相对名）：
+iOS 的 Surge 在沙箱里，Minis 看不到也写不了它的 profile；Controller 只提供只读的 `dump profile`，
+没有"改配置"的接口。所以 **iOS 的配置只能你在 Surge 里贴**，但脚本本身已经放好并验证过。
+
+脚本已单独放在独立仓库（不和你那些规则混在一起）：
+`https://github.com/gaoda212/surge-scripts`（public，脚本走 `raw.githubusercontent.com`，国内拿不到可用
+`https://cdn.jsdelivr.net/gh/gaoda212/surge-scripts@main/unmatched-log.js` —— raw 地址在国内网络下需要能通）。
 
 ```
-unmatched-log = type=rule,script-path=unmatched-log.js
-unmatched-export = type=generic,script-path=unmatched-export.js
+[Script]
+# ==== unmatched 漏网采样（Minis 添加；可整段删除）====
+unmatched-log = type=rule,script-path=https://raw.githubusercontent.com/gaoda212/surge-scripts/main/unmatched-log.js,debug=true
+unmatched-export = type=generic,script-path=https://raw.githubusercontent.com/gaoda212/surge-scripts/main/unmatched-export.js,debug=true
+# ==== unmatched 漏网采样 end ====
+
+[Rule]
+# ……原有规则不动……
+# 放在最后一条 FINAL 之前（你这里是 FINAL,🇺🇸MEGABOX_PRO_V6,dns-failed）：
+SCRIPT,unmatched-log,DIRECT
+FINAL,🇺🇸MEGABOX_PRO_V6,dns-failed
 ```
 
-规则同样 `SCRIPT,unmatched-log,DIRECT` 放在 FINAL 前。**iOS 与 Mac 的 `$persistentStore` 各存各的**，导出时 Mac 上看到的就是 Mac 的漏网。
+贴完在 Surge 里重载配置，随便刷点网页，然后：
+
+```sh
+cd /var/minis/workspace/surge-unmatched
+python3 deploy-ios.py export   # 立刻在终端看到 iOS 端的漏网清单
+```
+
+**iOS 与 Mac 的 `$persistentStore` 各存各的**，导出时连的是哪台设备，看到的就是哪台设备的记录。
 
 ## 验证
 
