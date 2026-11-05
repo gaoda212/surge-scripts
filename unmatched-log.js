@@ -47,8 +47,11 @@ let host = String(req.hostname || "").trim().toLowerCase().replace(/\.$/, "");
 let port = req.port || "";
 const proto = String(req.scheme || req.protocol || "").toUpperCase();
 
+// 自我保护：脚本自身、导出脚本的下载域名绝不能落到本脚本（否则首次加载时死循环）
+const SELF_HOSTS = ["raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com"];
+
 // ---- 记录 ----
-if (host && !$persistentStore.read(KEY_DISABLE) && !isIP(host) && !isRandom(host)) {
+if (host && !$persistentStore.read(KEY_DISABLE) && SELF_HOSTS.indexOf(host) < 0 && !isIP(host) && !isRandom(host)) {
     let list = readList();
     const now = Date.now();
     let idx = -1;
