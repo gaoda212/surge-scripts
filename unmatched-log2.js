@@ -6,10 +6,11 @@ const KEY_DISABLE = "Chinamax_Unmatched_Disabled";
 const KEY_MAX     = "Chinamax_Unmatched_Max";
 const DEFAULT_MAX = 4000;
 
-// 脚本自身与规则集下载域名，记录无意义（且脚本域名会造成自引用）
-const SELF_HOSTS = [
+// 不记录的域名：自身下载、规则集、Surge 自身服务（误拦会导致 Surge 失效）
+const SKIP_SUFFIX = [
     "raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com",
-    "adrules.top", "rule.kelee.one"
+    "adrules.top", "rule.kelee.one",
+    "nssurge.com", "nssurge-inc.com", "surge-activation.com"   // Surge 激活/许可证
 ];
 
 // 8-12 位字母数字且含数字 → 一次性随机域名
@@ -21,12 +22,21 @@ function isIP(h) {
     return h.indexOf(":") >= 0 && /^[0-9a-fA-F:.]+$/.test(h);
 }
 
+// 后缀匹配：h 等于 s，或以 "." + s 结尾
+function isSkipped(h) {
+    for (let i = 0; i < SKIP_SUFFIX.length; i++) {
+        const s = SKIP_SUFFIX[i];
+        if (h === s || h.slice(-(s.length + 1)) === "." + s) return true;
+    }
+    return false;
+}
+
 const req  = $request || {};
 const host = String(req.hostname || "").trim().toLowerCase().replace(/\.$/, "");
 const port = String(req.destPort || req.port || "");
 const proto = String((port === "443" ? "HTTPS" : "")).toUpperCase();
 
-if (host && !isIP(host) && SELF_HOSTS.indexOf(host) < 0
+if (host && !isIP(host) && !isSkipped(host)
     && !(RANDOM_RE.test(host) && /\d/.test(host.split(".")[0]))
     && !$persistentStore.read(KEY_DISABLE)) {
 
