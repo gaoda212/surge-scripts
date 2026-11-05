@@ -6,8 +6,11 @@ const KEY_DISABLE = "Chinamax_Unmatched_Disabled";
 const KEY_MAX     = "Chinamax_Unmatched_Max";
 const DEFAULT_MAX = 4000;
 
-// 脚本自身下载域名，记录会造成自引用
-const SELF_HOSTS = ["raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com"];
+// 脚本自身与规则集下载域名，记录无意义（且脚本域名会造成自引用）
+const SELF_HOSTS = [
+    "raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com",
+    "adrules.top", "rule.kelee.one"
+];
 
 // 8-12 位字母数字且含数字 → 一次性随机域名
 const RANDOM_RE = /^[a-z0-9]{8,12}\.(com|co|net|us|jp|io|xyz|top|vip|cc|org|info|site|shop)$/;
