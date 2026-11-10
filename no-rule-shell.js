@@ -14,6 +14,7 @@ const TTL        = 30 * 60 * 1000;
 const policy = ($argument && String($argument).trim()) || "DIRECT";
 
 function runSource(src) {
+    console.log("[DBG] runSource len="+src.length);
     try {
         eval(src);
     } catch (err) {
@@ -23,6 +24,7 @@ function runSource(src) {
 }
 
 const cached = $persistentStore.read(K_SRC);
+console.log("[DBG] cached="+(cached?cached.length:0)+" host="+($request&&$request.hostname)+" arg="+$argument);
 const lastCheck = parseInt($persistentStore.read(K_CHECKED) || "0", 10) || 0;
 const needCheck = !cached || (Date.now() - lastCheck > TTL);
 
