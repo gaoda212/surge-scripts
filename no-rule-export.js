@@ -47,7 +47,7 @@ if (!list.length) {
 
     list.forEach(x => {
         const n = x.n || 1;
-        const port = (x.p && x.p !== "443") ? " :" + x.p : "";
+        const port = (x.p && Number(x.p) !== 443) ? " :" + x.p : "";
         console.log(pad(x.h, 46) + pad(ago(x.t), 7) + pad(n + "x", 7) + ago(x.lt || x.t) + port);
     });
     $done({});
