@@ -1,6 +1,6 @@
-// 漏网主机清单（全量备查）。运行：Dashboard → Scripts → unmatched-export
-// 输出：一行一个域名，按首次发现时间倒序
-//   域名                 首见   次数  最近     端口(仅非443显示)
+// 漏网主机清单（全量）。运行：Dashboard → Scripts → unmatched-export
+// 输出按首次发现时间倒序，一行一个域名
+//   HOST  首见时间  次数  最近活跃  端口(非443才显示)
 
 const KEY = "Chinamax_Unmatched_Hosts_v2";
 
@@ -30,15 +30,17 @@ if (!list.length) {
     $done({});
 } else {
     list.sort((a, b) => (b.t || 0) - (a.t || 0));
-    const day = list.filter(x => Date.now() - (x.t || 0) < 86400000).length;
 
-    console.log("TOTAL " + list.length + " | new in 24h " + day);
-    console.log(pad("HOST", 44) + pad("FIRST", 7) + pad("HITS", 7) + "LAST");
+    const d1 = list.filter(x => Date.now() - (x.t || 0) < 86400000).length;
+    const d7 = list.filter(x => Date.now() - (x.t || 0) < 604800000).length;
+
+    console.log("TOTAL " + list.length + " | 24h " + d1 + " | 7d " + d7);
+    console.log(pad("HOST", 46) + pad("FIRST", 7) + pad("HITS", 7) + "LAST");
 
     list.forEach(x => {
         const n = x.n || 1;
         const port = (x.p && x.p !== "443") ? " :" + x.p : "";
-        console.log(pad(x.h, 44) + pad(ago(x.t), 6) + pad(n + "x", 7) + ago(x.lt || x.t) + port);
+        console.log(pad(x.h, 46) + pad(ago(x.t), 7) + pad(n + "x", 7) + ago(x.lt || x.t) + port);
     });
     $done({});
 }
