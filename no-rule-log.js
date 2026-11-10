@@ -2,8 +2,9 @@
 // Loaded by no-rule-log-shell.js. Keep this file pure ASCII:
 // Surge evals the raw bytes fetched by httpClient without UTF-8 decoding,
 // so non-ASCII comments break the script with a syntax error.
-// All declarations use var: const/let with array or object literals
-// intermittently throw inside Surge's rule-eval context.
+// Rule-eval context quirks (verified on Surge 6.100.0):
+// - no function declarations at all (they kill the whole script silently);
+// - var only, and no const/let name shared with the shell that eval's this.
 // Record format: { h: host, t: firstMs, lt: lastMs, n: hits, p: port, v: scheme }
 
 var KEY_HOSTS   = "Chinamax_NoRule_Hosts";
@@ -22,19 +23,19 @@ var SKIP_SUFFIX = [
 // A bare IP has no hostname to build a domain rule from.
 var SKIP_IP = true;
 
-function isIP(h) {
+var isIP = function (h) {
     if (!h) return true;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return true;
     return h.indexOf(":") >= 0 && /^[0-9a-fA-F:.]+$/.test(h);
-}
+};
 
-function isSkipped(h) {
+var isSkipped = function (h) {
     for (let i = 0; i < SKIP_SUFFIX.length; i++) {
         var s = SKIP_SUFFIX[i];
         if (h === s || h.slice(-(s.length + 1)) === "." + s) return true;
     }
     return false;
-}
+};
 
 // Reading $request explicitly keeps the engine from short-circuiting this
 // source when it is eval'ed inside the shell script.
