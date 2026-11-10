@@ -4,6 +4,9 @@
 
 const KEY = "Chinamax_NoRule_Hosts";
 
+// type=generic keeps the full statement support (functions, const), unlike
+// type=rule scripts, so this file may stay in the readable style.
+
 function ago(ts) {
     const min = Math.floor((Date.now() - (ts || 0)) / 60000);
     if (min < 1) return "now";
@@ -21,8 +24,13 @@ function pad(s, n) {
 
 let list = [];
 try {
-    const v = JSON.parse($persistentStore.read(KEY) || "[]");
-    if (Array.isArray(v)) list = v;
+    const v = JSON.parse($persistentStore.read(KEY) || "null");
+    if (v && !Array.isArray(v)) {
+        // v2 format: { host: {h,t,lt,n,p,v} }
+        Object.keys(v).forEach(k => list.push(v[k]));
+    } else if (Array.isArray(v)) {
+        list = v;
+    }
 } catch (e) { list = []; }
 
 if (!list.length) {
