@@ -7,13 +7,15 @@
 // Logic source: no-rule-log.js, fetched on first run and cached locally;
 // re-checked every 30 minutes, falls back to the cached copy on failure.
 // Pure ASCII on purpose (Surge evals raw bytes, no UTF-8 decoding).
+// Only var here: the logic is eval'ed into this same scope, and a repeated
+// top-level const/let declaration throws a SyntaxError that Surge swallows.
 
-const REMOTE_URL = "https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-log.js";
-const K_SRC      = "Chinamax_NoRule_ShellSrc";
-const K_CHECKED  = "Chinamax_NoRule_ShellChecked";
-const TTL        = 30 * 60 * 1000;
+var REMOTE_URL = "https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-log.js";
+var K_SRC      = "Chinamax_NoRule_ShellSrc";
+var K_CHECKED  = "Chinamax_NoRule_ShellChecked";
+var TTL        = 30 * 60 * 1000;
 
-const policy = ($argument && String($argument).trim()) || "DIRECT";
+var policy = ($argument && String($argument).trim()) || "DIRECT";
 
 function runSource(src) {
     try {
@@ -24,9 +26,9 @@ function runSource(src) {
     }
 }
 
-const cached = $persistentStore.read(K_SRC);
-const lastCheck = parseInt($persistentStore.read(K_CHECKED) || "0", 10) || 0;
-const needCheck = !cached || (Date.now() - lastCheck > TTL);
+var cached = $persistentStore.read(K_SRC);
+var lastCheck = parseInt($persistentStore.read(K_CHECKED) || "0", 10) || 0;
+var needCheck = !cached || (Date.now() - lastCheck > TTL);
 
 if (!needCheck) {
     runSource(cached);
