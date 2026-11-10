@@ -64,9 +64,9 @@ if (!req) {
         if (rec) {
             rec.n = (rec.n || 0) + 1;
             rec.lt = now;
-            if (req.port) rec.p = req.port;
+            if (req.port) rec.p = Number(req.port) || rec.p;
         } else {
-            db[host] = { h: host, t: now, lt: now, n: 1, p: req.port || 443, v: req.scheme || "" };
+            db[host] = { h: host, t: now, lt: now, n: 1, p: Number(req.port) || 443, v: req.scheme || "" };
         }
         var keys = Object.keys(db);
         if (keys.length > DEFAULT_MAX) {
