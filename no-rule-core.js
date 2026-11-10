@@ -6,7 +6,7 @@
 // 逻辑来源：no-rule-log.js；首次从远程拉取并缓存在本地，
 // 每 30 分钟检查一次更新，失败则继续用本地缓存。
 
-const REMOTE_URL = "https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-log.js";
+const REMOTE_URL = "https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-core-log.js";
 const K_SRC      = "Chinamax_NoRule_ShellSrc";
 const K_CHECKED  = "Chinamax_NoRule_ShellChecked";
 const TTL        = 30 * 60 * 1000;
