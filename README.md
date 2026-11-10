@@ -8,7 +8,7 @@ Surge 脚本：**no-rule**（记录所有未命中规则、最终走 FINAL 的�
 |---|---|
 | `no-rule-shell.js` | 外壳，Surge 实际加载这个（线上名 `no-rule-shell-final.js`）。从远程拉取记录逻辑，30 分钟检查更新 |
 | `no-rule-log.js` | 记录逻辑。**改这里**，无需动 Surge 配置 |
-| `no-rule-export.js` | 导出清单，手动运行（type=generic） |
+| `no-rule-cron.js` | **全自动导出**（type=cron，每天 8:00 / 20:00）。生成报告 + 有新域名才推送通知 |
 
 ## 配置
 
@@ -23,10 +23,12 @@ FINAL,United States,dns-failed
 
 ```ini
 no-rule-log = type=rule,script-path=https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-shell-final.js,debug=true
-no-rule-export = type=generic,script-path=https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-export.js,debug=true
+no-rule-cron = type=cron,cronexp="0 8,20 * * *",wake-system=true,timeout=30,script-path=https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-cron.js
 ```
 
-**导出脚本用 `type=generic`**，`type=rule` 下很多语句（见下）会炸。
+**全自动，无需任何手动操作**：`no-rule-cron` 每天 08:00 / 20:00 自动跑，结果写进 `Chinamax_NoRule_Report`；只有出现**新域名**时才推送通知（安静时不会打扰）。随时想手动跑一次：`surge-cli script run no-rule-cron`。
+
+**导出脚本用 `type=generic` / `type=cron`**，`type=rule` 下很多语句（见下）会炸。
 
 ## 原理
 
@@ -44,11 +46,18 @@ FINAL 命中数会变成 0（被脚本取代），这是正常的。
 
 容量 8000，超出按最近活跃时间淘汰。过滤：纯 IP、脚本/规则集自身域名、Surge 自身服务域名。
 
-## 导出
+## 导出（全自动）
 
-```bash
-# 输出：TOTAL | 24h | 7d + HOST/FIRST/HITS/LAST 表
+`no-rule-cron` 每 12 小时跑一次，产出写入 `Chinamax_NoRule_Report`：
+
 ```
+NO-RULE 2026-11-11 04:01 | TOTAL 2 | 24h 2 | 7d 2 | NEW 2
+HOST                                          FIRST  HITS  LAST
+cron-test-2.org                               now    1x    now
+cron-test-1.net                               now    1x    now
+```
+
+`NEW n` = 相比上一次运行新增的域名数；有新域名时同时推送一条通知（最多列 5 个）。
 
 ## Surge 6.100.0 rule 脚本的坑（全部实测确认）
 
