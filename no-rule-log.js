@@ -1,21 +1,23 @@
-// 记录所有未匹配任何规则、最终走 FINAL 的流量（由 no-rule-shell.js 加载）
-// 原则：宁多勿缺 —— 只排除"记录本身无意义"的项，其余全部记录，交由后续分析
-// 记录格式：{ h: 域名, t: 首次ms, lt: 最近ms, n: 次数, p: 端口 }
+// Records every request that matched no rule and fell through to FINAL.
+// Loaded by no-rule-log-shell.js. Keep this file pure ASCII:
+// Surge evals the raw bytes fetched by httpClient without UTF-8 decoding,
+// so non-ASCII comments break the script with a syntax error.
+// Record format: { h: host, t: firstMs, lt: lastMs, n: hits, p: port, v: scheme }
 
 const KEY_HOSTS   = "Chinamax_NoRule_Hosts";
 const KEY_DISABLE = "Chinamax_NoRule_Disabled";
 const DEFAULT_MAX = 8000;
 
-// 唯一排除项：会造成自引用或纯噪声
-//   1. 脚本/规则集自身的下载地址（记录会造成循环）
-//   2. Surge 自身服务（记录无分析价值）
+// Only exclude things that would self-reference or carry no analysis value:
+// 1. the script / rule-set download hosts themselves (recording them loops)
+// 2. Surge's own services
 const SKIP_SUFFIX = [
     "raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com",
     "adrules.top", "rule.kelee.one",
     "nssurge.com", "nssurge-inc.com", "surge-activation.com"
 ];
 
-// 纯 IP 无域名信息，无法用于域名规则分析
+// A bare IP has no hostname to build a domain rule from.
 const SKIP_IP = true;
 
 function isIP(h) {
@@ -32,40 +34,43 @@ function isSkipped(h) {
     return false;
 }
 
-const req  = $request || {};
-const host = String(req.hostname || "").trim().toLowerCase().replace(/\.$/, "");
-const port = String(req.destPort || req.port || "");
+// Reading $request explicitly keeps the engine from short-circuiting this
+// source when it is eval'ed inside the shell script.
+const req = (typeof $request !== "undefined") ? $request : null;
 
-const skipThis = !host
-    || isSkipped(host)
-    || (SKIP_IP && isIP(host))
-    || $persistentStore.read(KEY_DISABLE);
+const out = { matched: true, policy: policy };
 
-if (!skipThis) {
-    let list = [];
-    try {
-        const v = JSON.parse($persistentStore.read(KEY_HOSTS) || "[]");
-        if (Array.isArray(v)) list = v;
-    } catch (e) { list = []; }
-
-    const now = Date.now();
-    let hit = null;
-    for (let i = 0; i < list.length; i++) {
-        if (list[i] && list[i].h === host) { hit = list[i]; break; }
-    }
-
-    if (hit) {
-        hit.n = (hit.n || 1) + 1;
-        hit.lt = now;
+if (!req) {
+    $done(out);
+} else if ($persistentStore.read(KEY_DISABLE) === "1") {
+    $done(out);
+} else {
+    const host = req.hostname || "";
+    if (!host || (SKIP_IP && isIP(host)) || isSkipped(host)) {
+        $done(out);
     } else {
-        list.push({ h: host, t: now, lt: now, n: 1, p: port });
-        console.log("[no-rule] " + host);
+        const now = Date.now();
+        let db = {};
+        try {
+            const raw = $persistentStore.read(KEY_HOSTS);
+            if (raw) db = JSON.parse(raw) || {};
+        } catch (e) {
+            db = {};
+        }
+        const rec = db[host];
+        if (rec) {
+            rec.n = (rec.n || 0) + 1;
+            rec.lt = now;
+            if (req.port) rec.p = req.port;
+        } else {
+            db[host] = { h: host, t: now, lt: now, n: 1, p: req.port || 443, v: req.scheme || "" };
+        }
+        let keys = Object.keys(db);
+        if (keys.length > DEFAULT_MAX) {
+            keys.sort(function (a, b) { return (db[a].lt || 0) - (db[b].lt || 0); });
+            while (keys.length > DEFAULT_MAX) delete db[keys.shift()];
+        }
+        $persistentStore.write(JSON.stringify(db), KEY_HOSTS);
+        $done(out);
     }
-
-    if (list.length > DEFAULT_MAX) list = list.slice(-DEFAULT_MAX);
-    $persistentStore.write(JSON.stringify(list), KEY_HOSTS);
 }
-
-// 兜底策略必须与 FINAL 一致，由规则行第二参数传入
-const policy = ($argument && String($argument).trim()) || "DIRECT";
-$done({ matched: true, policy: policy });
