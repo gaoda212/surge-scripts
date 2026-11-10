@@ -1,16 +1,22 @@
 // 记录所有未匹配任何规则、最终走 FINAL 的流量（由 unmatched-shell.js 加载）
+// 原则：宁多勿缺 —— 只排除"记录本身无意义"的项，其余全部记录，交由后续分析
 // 记录格式：{ h: 域名, t: 首次ms, lt: 最近ms, n: 次数, p: 端口 }
 
 const KEY_HOSTS   = "Chinamax_Unmatched_Hosts_v2";
 const KEY_DISABLE = "Chinamax_Unmatched_Disabled";
-const DEFAULT_MAX = 4000;
+const DEFAULT_MAX = 8000;   // 容量放大，避免挤掉真实数据
 
-// 不记录的域名：脚本/规则集下载、Surge 自身服务
+// 唯一的排除项：记录它们会造成自引用或纯噪声
+//   1. 脚本/规则集自身的下载地址（记录会造成循环）
+//   2. Surge 自身服务（记录无分析价值）
 const SKIP_SUFFIX = [
     "raw.githubusercontent.com", "cdn.jsdelivr.net", "github.com", "objects.githubusercontent.com",
     "adrules.top", "rule.kelee.one",
     "nssurge.com", "nssurge-inc.com", "surge-activation.com"
 ];
+
+// 纯 IP 无域名信息，无法用于域名规则分析；若需统计可另外开启
+const SKIP_IP = true;
 
 function isIP(h) {
     if (!h) return true;
@@ -26,47 +32,16 @@ function isSkipped(h) {
     return false;
 }
 
-// 判断单个域名标签（label）是否像机器随机生成
-// 返回 true = 随机，false = 像正常单词/品牌
-function randomLabel(label) {
-    // 1. 含连续 5 个以上辅音（4 个会误伤 mtcaptcha 这类复合词）：几乎不可能是真实单词
-    if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(label)) return true;
-    // 2. 无元音
-    if (!/[aeiouy]/.test(label)) return true;
-    // 3. 键盘横向连敲（qwerty / asdfgh / zxcvb 等）
-    if (/qwer|wert|erty|rtyu|tyui|asdf|sdfg|dfgh|fghj|ghjk|hjkl|zxcv|xcvb|cvbn|vbnm/.test(label)) return true;
-    // 4. 字母数字混杂的 10 位以上随机串
-    if (/^[a-z0-9]{10,}$/.test(label)) {
-        const digits = (label.match(/\d/g) || []).length;
-        if (digits >= 2 && digits <= 8) return true;
-    }
-    return false;
-}
-
-// 主判断：整条主机名是否是随机域名
-function isRandomHost(h) {
-    const parts = h.split(".");
-    if (parts.length < 2) return false;
-    const tld = parts[parts.length - 1];
-    const main = parts[parts.length - 2];   // 主域
-
-    // 只看短后缀，避免误伤 .com.cn 这类
-    const SHORT_TLD = ["com", "co", "net", "us", "jp", "io", "xyz", "top", "vip", "cc",
-                       "org", "info", "site", "shop", "uk", "me", "tv", "biz", "pro"];
-    if (SHORT_TLD.indexOf(tld) < 0) return false;
-
-    // 主域必须是 8-13 位纯字母数字才可能是随机串
-    if (!/^[a-z0-9]{8,13}$/.test(main)) return false;
-    return randomLabel(main);
-}
-
 const req  = $request || {};
 const host = String(req.hostname || "").trim().toLowerCase().replace(/\.$/, "");
 const port = String(req.destPort || req.port || "");
 
-if (host && !isIP(host) && !isSkipped(host) && !isRandomHost(host)
-    && !$persistentStore.read(KEY_DISABLE)) {
+const skipThis = !host
+    || isSkipped(host)
+    || (SKIP_IP && isIP(host))
+    || $persistentStore.read(KEY_DISABLE);
 
+if (!skipThis) {
     let list = [];
     try {
         const v = JSON.parse($persistentStore.read(KEY_HOSTS) || "[]");
