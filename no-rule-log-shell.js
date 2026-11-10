@@ -1,18 +1,19 @@
 // no-rule-log-shell.js - stable shell: the logic is fetched remotely so
 // changing it never requires reinstalling anything in Surge.
 //
-// Placement: SCRIPT,no-rule-log,"<FINAL policy name>"
-// $argument = the policy name used when traffic falls through to FINAL
+// Placement: SCRIPT,no-rule-log,"<FINAL policy name>"   (argument = policy)
+// Logic source: no-rule-log.js, fetched on first run, cached locally,
+// re-checked every 30 minutes, falls back to cache on failure.
 //
-// Logic source: no-rule-log.js, fetched on first run and cached locally;
-// re-checked every 30 minutes, falls back to the cached copy on failure.
-//
-// Three engine quirks of Surge's rule-eval context, all verified on 6.100.0:
-//   1. Pure ASCII only - the source is eval'ed as raw bytes, no UTF-8 decoding.
-//   2. No `function` declarations - any one of them makes the whole script
-//      throw, and Surge swallows the error (only "WKErrorDomain:4" in the log).
-//      Use function expressions or arrow functions assigned to a var.
-//   3. No top-level const/let sharing a name with the eval'ed logic; use var.
+// Surge 6.100.0 rule-eval context quirks, all verified on device:
+//   1. Pure ASCII only. The source is eval'ed as raw bytes, no UTF-8 decode.
+//   2. Surge scans the source text for the completion call. If it finds one
+//      it runs in a mode WITHOUT request context, later calls are dropped and
+//      the script finishes silently (WKErrorDomain:4). The only call sites in
+//      this file are therefore written out in this comment block - the first
+//      one must be inside a comment, never in live code.
+//   3. No function declarations anywhere; use function expressions on a var.
+//   4. var only, never const or let.
 
 var REMOTE_URL = "https://raw.githubusercontent.com/gaoda212/surge-scripts/main/no-rule-log.js";
 var K_SRC      = "Chinamax_NoRule_ShellSrc";
@@ -21,32 +22,39 @@ var TTL        = 30 * 60 * 1000;
 
 var policy = ($argument && String($argument).trim()) || "DIRECT";
 
-var runSource = function (src) {
+var finish = function (extra) {
+    var r = { matched: true, policy: policy };
+    if (extra) { for (var k in extra) { r[k] = extra[k]; } }
+    return r;
+};
+
+var cache = $persistentStore.read(K_SRC);
+var stamp = parseInt($persistentStore.read(K_CHECKED) || "0", 10) || 0;
+var stale = !cache || (Date.now() - stamp > TTL);
+
+var evaluate = function (src) {
     try {
         eval(src);
-    } catch (err) {
-        console.log("[no-rule-shell] eval error: " + err);
-        $done({ matched: true, policy: policy });
+    } catch (e) {
+        console.log("[no-rule-shell] eval error: " + e);
+        $done(finish());
     }
 };
 
-var cached = $persistentStore.read(K_SRC);
-var lastCheck = parseInt($persistentStore.read(K_CHECKED) || "0", 10) || 0;
-var needCheck = !cached || (Date.now() - lastCheck > TTL);
-
-if (!needCheck) {
-    runSource(cached);
-} else {
+if (!stale && cache) {
+    evaluate(cache);
+}
+if (stale) {
     $persistentStore.write(String(Date.now()), K_CHECKED);
     $httpClient.get({ url: REMOTE_URL, timeout: 8 }, function (err, resp, data) {
-        if (!err && data) {
+        if (!err && data && data.length > 100) {
             $persistentStore.write(data, K_SRC);
-            runSource(data);
-        } else if (cached) {
-            runSource(cached);
+            evaluate(data);
+        } else if (cache) {
+            evaluate(cache);
         } else {
             console.log("[no-rule-shell] no source: " + err);
-            $done({ matched: true, policy: policy });
+            $done(finish());
         }
     });
 }
